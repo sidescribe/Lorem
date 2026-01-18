@@ -1,6 +1,7 @@
 import React from 'react';
 import ReactDOM from 'react-dom/client';
 import App from './App';
+import { registerServiceWorker } from './registerSW';
 import './index.css';
 
 const root = ReactDOM.createRoot(
@@ -12,3 +13,8 @@ root.render(
     <App />
   </React.StrictMode>
 );
+
+// Register PWA service worker (vite-plugin-pwa)
+try {
+  registerServiceWorker()
+} catch {}

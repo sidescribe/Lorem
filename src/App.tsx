@@ -1,4 +1,5 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
+import { loadContacts, saveContacts } from './storage/localStorage';
 import {
   Box,
   Paper,
@@ -37,10 +38,17 @@ interface Contact {
 }
 
 function App() {
-  const [contacts, setContacts] = useState<Contact[]>([
-    { id: '1', name: 'John Doe', email: 'john@example.com', company: 'Tech Corp', status: 'active' },
-    { id: '2', name: 'Jane Smith', email: 'jane@example.com', company: 'Startup Inc', status: 'active' },
-  ]);
+  const stored = loadContacts()
+  const [contacts, setContacts] = useState<Contact[]>(
+    stored ?? [
+      { id: '1', name: 'John Doe', email: 'john@example.com', company: 'Tech Corp', status: 'active' },
+      { id: '2', name: 'Jane Smith', email: 'jane@example.com', company: 'Startup Inc', status: 'active' },
+    ]
+  );
+
+  useEffect(() => {
+    saveContacts(contacts)
+  }, [contacts])
 
   const [open, setOpen] = useState(false);
   const [editingContact, setEditingContact] = useState<Contact | null>(null);
