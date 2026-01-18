@@ -1,0 +1,547 @@
+#!/bin/bash
+
+# CRM Application Complete Setup Script
+
+# This script creates the entire project structure with all files
+
+echo “🚀 Creating CRM Application…”
+
+# Create main project directory
+
+mkdir -p crm-app
+cd crm-app
+
+# ============================================
+
+# BACKEND SETUP
+
+# ============================================
+
+echo “📦 Setting up backend…”
+
+mkdir -p backend/src/{config,controllers,middleware,models,routes,utils}
+
+# Backend package.json
+
+cat > backend/package.json << ‘EOF’
+{
+“name”: “crm-backend”,
+“version”: “1.0.0”,
+“description”: “CRM Backend API with Express and SQLite”,
+“main”: “src/server.js”,
+“scripts”: {
+“start”: “node src/server.js”,
+“dev”: “nodemon src/server.js”,
+“seed”: “node src/utils/seedDatabase.js”
+},
+“keywords”: [“crm”, “api”, “express”],
+“author”: “”,
+“license”: “MIT”,
+“dependencies”: {
+“express”: “^4.18.2”,
+“cors”: “^2.8.5”,
+“dotenv”: “^16.3.1”,
+“bcryptjs”: “^2.4.3”,
+“jsonwebtoken”: “^9.0.2”,
+“sqlite3”: “^5.1.6”,
+“sequelize”: “^6.35.1”,
+“express-validator”: “^7.0.1”,
+“helmet”: “^7.1.0”,
+“morgan”: “^1.10.0”
+},
+“devDependencies”: {
+“nodemon”: “^3.0.2”
+}
+}
+EOF
+
+# Backend .env.example
+
+cat > backend/.env.example << ‘EOF’
+PORT=5000
+NODE_ENV=development
+
+DB_DIALECT=sqlite
+DB_STORAGE=./database.sqlite
+
+JWT_SECRET=your_super_secret_jwt_key_change_this_in_production
+JWT_EXPIRE=7d
+
+CORS_ORIGIN=http://localhost:5173
+EOF
+
+# Backend .gitignore
+
+cat > backend/.gitignore << ‘EOF’
+node_modules/
+.env
+*.sqlite
+*.sqlite3
+logs/
+*.log
+npm-debug.log*
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
+EOF
+
+# Backend server.js
+
+cat > backend/src/server.js << ‘EOF’
+const express = require(‘express’);
+const cors = require(‘cors’);
+const helmet = require(‘helmet’);
+const morgan = require(‘morgan’);
+require(‘dotenv’).config();
+
+const { sequelize } = require(’./config/database’);
+const errorHandler = require(’./middleware/errorHandler’);
+
+const authRoutes = require(’./routes/authRoutes’);
+const contactRoutes = require(’./routes/contactRoutes’);
+const leadRoutes = require(’./routes/leadRoutes’);
+const dealRoutes = require(’./routes/dealRoutes’);
+const activityRoutes = require(’./routes/activityRoutes’);
+
+const app = express();
+const PORT = process.env.PORT || 5000;
+
+app.use(helmet());
+app.use(cors({
+origin: process.env.CORS_ORIGIN || ‘http://localhost:5173’,
+credentials: true
+}));
+app.use(express.json());
+app.use(express.urlencoded({ extended: true }));
+app.use(morgan(‘dev’));
+
+app.get(’/api/health’, (req, res) => {
+res.json({ status: ‘OK’, message: ‘CRM API is running’ });
+});
+
+app.use(’/api/auth’, authRoutes);
+app.use(’/api/contacts’, contactRoutes);
+app.use(’/api/leads’, leadRoutes);
+app.use(’/api/deals’, dealRoutes);
+app.use(’/api/activities’, activityRoutes);
+
+app.use(errorHandler);
+
+const startServer = async () => {
+try {
+await sequelize.sync({ alter: true });
+console.log(‘✅ Database connected and synchronized’);
+
+```
+app.listen(PORT, () => {
+  console.log(`🚀 Server running on port ${PORT}`);
+  console.log(`📍 Environment: ${process.env.NODE_ENV || 'development'}`);
+  console.log(`🔗 API available at http://localhost:${PORT}/api`);
+});
+```
+
+} catch (error) {
+console.error(‘❌ Unable to start server:’, error);
+process.exit(1);
+}
+};
+
+startServer();
+
+module.exports = app;
+EOF
+
+# Backend database.js
+
+cat > backend/src/config/database.js << ‘EOF’
+const { Sequelize } = require(‘sequelize’);
+require(‘dotenv’).config();
+
+const dbDialect = process.env.DB_DIALECT || ‘sqlite’;
+
+let sequelize;
+
+if (dbDialect === ‘sqlite’) {
+sequelize = new Sequelize({
+dialect: ‘sqlite’,
+storage: process.env.DB_STORAGE || ‘./database.sqlite’,
+logging: process.env.NODE_ENV === ‘development’ ? console.log : false,
+});
+} else if (dbDialect === ‘postgres’) {
+sequelize = new Sequelize(
+process.env.DB_NAME,
+process.env.DB_USER,
+process.env.DB_PASSWORD,
+{
+host: process.env.DB_HOST || ‘localhost’,
+port: process.env.DB_PORT || 5432,
+dialect: ‘postgres’,
+logging: process.env.NODE_ENV === ‘development’ ? console.log : false,
+pool: {
+max: 5,
+min: 0,
+acquire: 30000,
+idle: 10000
+}
+}
+);
+}
+
+module.exports = { sequelize };
+EOF
+
+# Backend errorHandler.js
+
+cat > backend/src/middleware/errorHandler.js << ‘EOF’
+const errorHandler = (err, req, res, next) => {
+console.error(‘Error:’, err);
+
+if (err.name === ‘SequelizeValidationError’) {
+return res.status(400).json({
+message: ‘Validation error’,
+errors: err.errors.map(e => ({
+field: e.path,
+message: e.message
+}))
+});
+}
+
+if (err.name === ‘SequelizeUniqueConstraintError’) {
+return res.status(400).json({
+message: ‘Duplicate entry’,
+errors: err.errors.map(e => ({
+field: e.path,
+message: `${e.path} already exists`
+}))
+});
+}
+
+if (err.name === ‘JsonWebTokenError’) {
+return res.status(401).json({ message: ‘Invalid token’ });
+}
+
+if (err.name === ‘TokenExpiredError’) {
+return res.status(401).json({ message: ‘Token expired’ });
+}
+
+res.status(err.status || 500).json({
+message: err.message || ‘Internal server error’,
+…(process.env.NODE_ENV === ‘development’ && { stack: err.stack })
+});
+};
+
+module.exports = errorHandler;
+EOF
+
+# Backend auth.js middleware
+
+cat > backend/src/middleware/auth.js << ‘EOF’
+const jwt = require(‘jsonwebtoken’);
+const User = require(’../models/User’);
+
+const auth = async (req, res, next) => {
+try {
+const token = req.header(‘Authorization’)?.replace(’Bearer ’, ‘’);
+
+```
+if (!token) {
+  return res.status(401).json({ message: 'No authentication token, access denied' });
+}
+
+const decoded = jwt.verify(token, process.env.JWT_SECRET);
+
+const user = await User.findByPk(decoded.id, {
+  attributes: { exclude: ['password'] }
+});
+
+if (!user || !user.isActive) {
+  return res.status(401).json({ message: 'User not found or inactive' });
+}
+
+req.user = user;
+next();
+```
+
+} catch (error) {
+res.status(401).json({ message: ‘Token is not valid’ });
+}
+};
+
+const authorize = (…roles) => {
+return (req, res, next) => {
+if (!roles.includes(req.user.role)) {
+return res.status(403).json({
+message: ‘Access denied. Insufficient permissions.’
+});
+}
+next();
+};
+};
+
+module.exports = { auth, authorize };
+EOF
+
+# Backend User.js model
+
+cat > backend/src/models/User.js << ‘EOF’
+const { DataTypes } = require(‘sequelize’);
+const bcrypt = require(‘bcryptjs’);
+const { sequelize } = require(’../config/database’);
+
+const User = sequelize.define(‘User’, {
+id: {
+type: DataTypes.INTEGER,
+primaryKey: true,
+autoIncrement: true
+},
+firstName: {
+type: DataTypes.STRING,
+allowNull: false
+},
+lastName: {
+type: DataTypes.STRING,
+allowNull: false
+},
+email: {
+type: DataTypes.STRING,
+allowNull: false,
+unique: true,
+validate: {
+isEmail: true
+}
+},
+password: {
+type: DataTypes.STRING,
+allowNull: false
+},
+role: {
+type: DataTypes.ENUM(‘admin’, ‘sales’, ‘user’),
+defaultValue: ‘user’
+},
+isActive: {
+type: DataTypes.BOOLEAN,
+defaultValue: true
+}
+}, {
+timestamps: true,
+hooks: {
+beforeCreate: async (user) => {
+if (user.password) {
+user.password = await bcrypt.hash(user.password, 10);
+}
+},
+beforeUpdate: async (user) => {
+if (user.changed(‘password’)) {
+user.password = await bcrypt.hash(user.password, 10);
+}
+}
+}
+});
+
+User.prototype.comparePassword = async function(candidatePassword) {
+return await bcrypt.compare(candidatePassword, this.password);
+};
+
+module.exports = User;
+EOF
+
+# Backend Contact.js model
+
+cat > backend/src/models/Contact.js << ‘EOF’
+const { DataTypes } = require(‘sequelize’);
+const { sequelize } = require(’../config/database’);
+const User = require(’./User’);
+
+const Contact = sequelize.define(‘Contact’, {
+id: {
+type: DataTypes.INTEGER,
+primaryKey: true,
+autoIncrement: true
+},
+firstName: {
+type: DataTypes.STRING,
+allowNull: false
+},
+lastName: {
+type: DataTypes.STRING,
+allowNull: false
+},
+email: {
+type: DataTypes.STRING,
+allowNull: false,
+validate: {
+isEmail: true
+}
+},
+phone: {
+type: DataTypes.STRING
+},
+company: {
+type: DataTypes.STRING
+},
+position: {
+type: DataTypes.STRING
+},
+address: {
+type: DataTypes.TEXT
+},
+city: {
+type: DataTypes.STRING
+},
+state: {
+type: DataTypes.STRING
+},
+country: {
+type: DataTypes.STRING
+},
+postalCode: {
+type: DataTypes.STRING
+},
+notes: {
+type: DataTypes.TEXT
+},
+tags: {
+type: DataTypes.JSON,
+defaultValue: []
+},
+status: {
+type: DataTypes.ENUM(‘active’, ‘inactive’, ‘prospect’),
+defaultValue: ‘active’
+}
+}, {
+timestamps: true
+});
+
+Contact.belongsTo(User, { as: ‘owner’, foreignKey: ‘ownerId’ });
+
+module.exports = Contact;
+EOF
+
+# Backend Lead.js model
+
+cat > backend/src/models/Lead.js << ‘EOF’
+const { DataTypes } = require(‘sequelize’);
+const { sequelize } = require(’../config/database’);
+const User = require(’./User’);
+const Contact = require(’./Contact’);
+
+const Lead = sequelize.define(‘Lead’, {
+id: {
+type: DataTypes.INTEGER,
+primaryKey: true,
+autoIncrement: true
+},
+title: {
+type: DataTypes.STRING,
+allowNull: false
+},
+description: {
+type: DataTypes.TEXT
+},
+value: {
+type: DataTypes.DECIMAL(10, 2),
+defaultValue: 0
+},
+status: {
+type: DataTypes.ENUM(‘new’, ‘contacted’, ‘qualified’, ‘proposal’, ‘negotiation’, ‘won’, ‘lost’),
+defaultValue: ‘new’
+},
+source: {
+type: DataTypes.STRING
+},
+priority: {
+type: DataTypes.ENUM(‘low’, ‘medium’, ‘high’),
+defaultValue: ‘medium’
+},
+expectedCloseDate: {
+type: DataTypes.DATE
+},
+probability: {
+type: DataTypes.INTEGER,
+defaultValue: 0,
+validate: {
+min: 0,
+max: 100
+}
+},
+notes: {
+type: DataTypes.TEXT
+}
+}, {
+timestamps: true
+});
+
+Lead.belongsTo(User, { as: ‘owner’, foreignKey: ‘ownerId’ });
+Lead.belongsTo(Contact, { foreignKey: ‘contactId’ });
+
+module.exports = Lead;
+EOF
+
+# Backend Deal.js model
+
+cat > backend/src/models/Deal.js << ‘EOF’
+const { DataTypes } = require(‘sequelize’);
+const { sequelize } = require(’../config/database’);
+const User = require(’./User’);
+const Contact = require(’./Contact’);
+
+const Deal = sequelize.define(‘Deal’, {
+id: {
+type: DataTypes.INTEGER,
+primaryKey: true,
+autoIncrement: true
+},
+title: {
+type: DataTypes.STRING,
+allowNull: false
+},
+description: {
+type: DataTypes.TEXT
+},
+value: {
+type: DataTypes.DECIMAL(10, 2),
+allowNull: false
+},
+stage: {
+type: DataTypes.ENUM(‘prospecting’, ‘qualification’, ‘proposal’, ‘negotiation’, ‘closed_won’, ‘closed_lost’),
+defaultValue: ‘prospecting’
+},
+probability: {
+type: DataTypes.INTEGER,
+defaultValue: 0,
+validate: {
+min: 0,
+max: 100
+}
+},
+expectedCloseDate: {
+type: DataTypes.DATE
+},
+actualCloseDate: {
+type: DataTypes.DATE
+},
+notes: {
+type: DataTypes.TEXT
+}
+}, {
+timestamps: true
+});
+
+Deal.belongsTo(User, { as: ‘owner’, foreignKey: ‘ownerId’ });
+Deal.belongsTo(Contact, { foreignKey: ‘contactId’ });
+
+module.exports = Deal;
+EOF
+
+# Backend Activity.js model
+
+cat > backend/src/models/Activity.js << ‘EOF’
+const { DataTypes } = require(‘sequelize’);
+const { sequelize } = require(’../config/database’);
+const User = require(’./User’);
+const Contact = require(’./Contact’);
+const Lead = require(’./Lead’);
+const Deal = require(’./Deal’);
+
+const Activity
