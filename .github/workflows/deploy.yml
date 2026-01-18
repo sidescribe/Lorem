@@ -14,16 +14,17 @@ jobs:
     - name: Checkout
       uses: actions/checkout@v3
 
+    - name: Run CRM setup script
+      run: |
+        chmod +x Lorem
+        bash Lorem
+
     - name: Setup Node.js
       uses: actions/setup-node@v3
       with:
         node-version: '18'
         cache: 'npm'
-
-    - name: Run CRM setup script
-      run: |
-        chmod +x Lorem
-        bash Lorem
+        cache-dependency-path: crm-app/frontend/package-lock.json
 
     - name: Install dependencies
       run: |
