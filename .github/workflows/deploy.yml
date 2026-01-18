@@ -19,18 +19,24 @@ jobs:
         mkdir -p crm-app/frontend
         cp -r src crm-app/frontend/
         cp -r public crm-app/frontend/
+        # ensure Vite entry and PWA assets are at the frontend root
+        cp public/index.html crm-app/frontend/index.html || true
+        cp public/manifest.json crm-app/frontend/manifest.json || true
+        cp public/favicon.svg crm-app/frontend/favicon.svg || true
+        cp public/logo192.svg crm-app/frontend/logo192.svg || true
+        cp public/logo512.svg crm-app/frontend/logo512.svg || true
         cp package.json crm-app/frontend/
         cp package-lock.json crm-app/frontend/
 
     - name: Setup Node.js
       uses: actions/setup-node@v3
       with:
-        node-version: '18'
+        node-version: '20'
 
     - name: Install dependencies
       run: |
         cd crm-app/frontend
-        npm ci
+        npm install
 
     - name: Build
       run: |
