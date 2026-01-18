@@ -20,6 +20,7 @@ jobs:
         cp -r src crm-app/frontend/
         cp -r public crm-app/frontend/
         cp package.json crm-app/frontend/
+        cp package-lock.json crm-app/frontend/
 
     - name: Setup Node.js
       uses: actions/setup-node@v3
