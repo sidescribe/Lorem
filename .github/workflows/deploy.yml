@@ -26,7 +26,6 @@ jobs:
       with:
         node-version: '18'
         cache: 'npm'
-        cache-dependency-path: crm-app/frontend/package-lock.json
 
     - name: Install dependencies
       run: |
