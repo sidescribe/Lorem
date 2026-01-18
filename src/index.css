@@ -1,0 +1,25 @@
+body {
+  margin: 0;
+  font-family: 'Roboto', 'Helvetica', 'Arial', sans-serif;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  background-color: #f5f5f5;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+.MuiButton-root {
+  text-transform: none;
+  border-radius: 8px;
+}
+
+.MuiCard-root {
+  border-radius: 12px;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+}
+
+.MuiPaper-root {
+  border-radius: 12px;
+}
